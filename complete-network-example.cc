@@ -28,73 +28,127 @@
 #include "ns3/forwarder-helper.h"
 #include "ns3/waypoint-mobility-model.h"
 #include <algorithm>
+#include "ns3/one-shot-sender-helper.h"
 #include <ctime>
+#include "ns3/internet-module.h"
+#include "ns3/network-module.h"
+#include "ns3/stats-module.h"
 
 using namespace ns3;
 using namespace lorawan;
 
 NS_LOG_COMPONENT_DEFINE ("ComplexLorawanNetworkExample");
 
-// Network settings
-int nDevices = 200;
-int nGateways = 1;
-double radius = 7500;
-double simulationTime = 600;
-
-// Channel model
-bool realisticChannelModel = false;
-
-int appPeriodSeconds = 600;
-
-// Output control
-bool print = true;
-
 int
 main (int argc, char *argv[])
 {
 
+
+
   CommandLine cmd;
-  cmd.AddValue ("nDevices", "Number of end devices to include in the simulation", nDevices);
-  cmd.AddValue ("radius", "The radius of the area to simulate", radius);
-  cmd.AddValue ("simulationTime", "The time for which to simulate", simulationTime);
-  cmd.AddValue ("appPeriod",
-                "The period in seconds to be used by periodically transmitting applications",
-                appPeriodSeconds);
-  cmd.AddValue ("print", "Whether or not to print various informations", print);
   cmd.Parse (argc, argv);
 
   // Set up logging
-  LogComponentEnable ("ComplexLorawanNetworkExample", LOG_LEVEL_ALL);
-  // LogComponentEnable("LoraChannel", LOG_LEVEL_INFO);
-  // LogComponentEnable("LoraPhy", LOG_LEVEL_ALL);
-  // LogComponentEnable("EndDeviceLoraPhy", LOG_LEVEL_ALL);
-  // LogComponentEnable("GatewayLoraPhy", LOG_LEVEL_ALL);
-  // LogComponentEnable("LoraInterferenceHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("LorawanMac", LOG_LEVEL_ALL);
-  // LogComponentEnable("EndDeviceLorawanMac", LOG_LEVEL_ALL);
-  // LogComponentEnable("ClassAEndDeviceLorawanMac", LOG_LEVEL_ALL);
-  // LogComponentEnable("GatewayLorawanMac", LOG_LEVEL_ALL);
-  // LogComponentEnable("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("LogicalLoraChannel", LOG_LEVEL_ALL);
-  // LogComponentEnable("LoraHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("LoraPhyHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("LorawanMacHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("PeriodicSenderHelper", LOG_LEVEL_ALL);
-  // LogComponentEnable("PeriodicSender", LOG_LEVEL_ALL);
-  // LogComponentEnable("LorawanMacHeader", LOG_LEVEL_ALL);
-  // LogComponentEnable("LoraFrameHeader", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkScheduler", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkServer", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkStatus", LOG_LEVEL_ALL);
-  // LogComponentEnable("NetworkController", LOG_LEVEL_ALL);
+   // LogComponentEnable ("SimpleLorawanNetworkExample", LOG_LEVEL_ALL);
+  LogComponentEnable ("LoraChannel", LOG_LEVEL_INFO);
+  LogComponentEnable ("LoraPhy", LOG_LEVEL_ALL);
+  // LogComponentEnable ("EndDeviceLoraPhy", LOG_LEVEL_ALL);
+  LogComponentEnable ("GatewayLoraPhy", LOG_LEVEL_ALL);
+  LogComponentEnable ("LoraInterferenceHelper", LOG_LEVEL_ALL);
+  LogComponentEnable ("LorawanMac", LOG_LEVEL_ALL);
+  LogComponentEnable ("EndDeviceLorawanMac", LOG_LEVEL_ALL);
+  LogComponentEnable ("ClassAEndDeviceLorawanMac", LOG_LEVEL_ALL);
+  LogComponentEnable ("GatewayLorawanMac", LOG_LEVEL_ALL);
+  LogComponentEnable ("LogicalLoraChannelHelper", LOG_LEVEL_ALL);
+  LogComponentEnable ("LogicalLoraChannel", LOG_LEVEL_ALL);
+  // LogComponentEnable ("LoraHelper", LOG_LEVEL_ALL);
+  // LogComponentEnable ("LoraPhyHelper", LOG_LEVEL_ALL);
+  // LogComponentEnable ("LorawanMacHelper", LOG_LEVEL_ALL);
+  // LogComponentEnable ("OneShotSenderHelper", LOG_LEVEL_ALL);
+  // LogComponentEnable ("OneShotSender", LOG_LEVEL_ALL);
+  // LogComponentEnable ("LorawanMacHeader", LOG_LEVEL_ALL);
+  // LogComponentEnable ("LoraFrameHeader", LOG_LEVEL_ALL);
+  LogComponentEnableAll (LOG_PREFIX_FUNC);
+  LogComponentEnableAll (LOG_PREFIX_NODE);
+  LogComponentEnableAll (LOG_PREFIX_TIME);
+
+
+
+   /************************
+  *  Create End Devices  *
+  ************************/
+  NodeContainer nodes;
+  nodes.Create (2);
+
+
+    /************************
+   *  Create the channel  *
+   ************************/
+
+  // Create the lora channel object
+
+
+  Ptr<LogDistancePropagationLossModel> loss = CreateObject<LogDistancePropagationLossModel> ();
+  loss->SetPathLossExponent (3.76);
+  loss->SetReference (1, 7.7);
+
+  Ptr<PropagationDelayModel> delay = CreateObject<ConstantSpeedPropagationDelayModel> ();
+
+  Ptr<LoraChannel> channel = CreateObject<LoraChannel> (loss, delay);
+
+
+
+
+  
+
+   /************************
+  *  Create the helpers  *
+  ************************/
+  // Create the LoraPhyHelper
+        
+  LoraPhyHelper phyHelper = LoraPhyHelper ();
+  phyHelper.SetChannel (channel);
+
+  // Create the LorawanMacHelper
+  LorawanMacHelper macHelper = LorawanMacHelper ();
+
+  
+
+  // Create the LoraHelper
+  LoraHelper helper = LoraHelper ();
+
+
+
+
+  phyHelper.SetDeviceType (LoraPhyHelper::ED);
+  macHelper.SetDeviceType (LorawanMacHelper::ED_A);
+
+  helper.Install (phyHelper, macHelper, nodes);  
+
+
+
+  
 
   /***********
    *  Setup  *
    ***********/
 
-  NodeContainer nodes;
-  nodes.Create (2);
 
+  OneShotSenderHelper oneShotHelper = OneShotSenderHelper ();
+  oneShotHelper.SetSendTime (Seconds (10));
+  oneShotHelper.Install (nodes.Get (1));
+
+    /******************
+   * Set Data Rates *
+   ******************/
+  // std::vector<int> sfQuantity (6);
+  // sfQuantity = macHelper.SetSpreadingFactorsUp (nodes, channel);
+
+   
+
+   /************************
+   *  Mobility  *
+   ************************/
   MobilityHelper mobility;
   // mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
   //                                 "MinX", DoubleValue (0.0),
@@ -105,14 +159,16 @@ main (int argc, char *argv[])
   //                                 "LayoutType", StringValue ("RowFirst"));
  
 
-   
+  
   mobility.SetMobilityModel("ns3::WaypointMobilityModel");
 
   mobility.Install(nodes);
 
 
+
    Ptr<WaypointMobilityModel> ueWaypointMobility = DynamicCast<WaypointMobilityModel>( nodes.Get(1)->GetObject<MobilityModel>());
    // ueWaypointMobility->SetPosition(Vector (0, 0, 0));
+ 
   
    //Первая половина окружности
   ueWaypointMobility->AddWaypoint(Waypoint(Seconds(1.0),Vector(0, 0,0)));
@@ -129,8 +185,20 @@ main (int argc, char *argv[])
   ueWaypointMobility->AddWaypoint (Waypoint (Seconds (11.0),Vector (-40, 48.99, 0)));
   ueWaypointMobility->AddWaypoint(Waypoint (Seconds (12.0),Vector (-20, 40, 0)));
   ueWaypointMobility->AddWaypoint(Waypoint (Seconds (13.0),Vector (0, 0, 0)));
+   NS_LOG_INFO ("IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII");
 
-   
+
+////////////////
+  // Counter //
+  ////////////////
+
+  Ptr<PacketCounterCalculator> totalRx =
+  CreateObject<PacketCounterCalculator>();
+  totalRx->SetKey ("wifi-rx-frames");
+  totalRx->SetContext ("node[1]");
+  Config::Connect ("/NodeList/1/DeviceList/*/$ns3::LoraNetDevice/Mac/MacRx",
+                   MakeCallback (&PacketCounterCalculator::PacketUpdate,
+                                 totalRx));
 
   ////////////////
   // Simulation //
